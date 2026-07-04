@@ -17,6 +17,7 @@ class UserPublic(BaseModel):
     
 class UserPrivate(UserPublic):
     email: EmailStr
+
 class UserUpdate(BaseModel):
     username: str | None = Field(default=None, min_length=1,  max_length=50)
     email: EmailStr | None = Field(default=None, max_length=120)
@@ -31,7 +32,7 @@ class PostBase(BaseModel):
     content: str = Field(min_length=1)
 
 class PostCreate(PostBase):
-    user_id: int   # TEMPORARY
+    pass
 
 class PostUpdate(BaseModel):
     title: str | None = Field(default=None,min_length=1, max_length=100)
