@@ -11,4 +11,6 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
+    max_profile_image_size: int = 5 * 1024 * 1024 # 5MB
+
 settings = Settings() #this is loaded from .env file
