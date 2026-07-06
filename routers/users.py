@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from PIL import UnidentifiedImageError
 from sqlalchemy import select, func
@@ -15,7 +15,7 @@ from auth import create_access_token, hash_password, verify_password, CurrentUse
 from config import settings
 from database import get_db
 from imageutils import process_profile_image, delete_profile_image
-from schemas import PostResponse, UserCreate, UserPrivate, UserPublic, UserUpdate, Token
+from schemas import PostResponse, UserCreate, UserPrivate, UserPublic, UserUpdate, Token, PaginatedPostsResponse
 
 router = APIRouter()
 
@@ -79,9 +79,10 @@ async def get_current_user(current_user: CurrentUser):
 
 
 @router.get('/{user_id}', response_model=UserPublic)
-async def get_users(user_id: int,
-                    db: Annotated[AsyncSession, Depends(get_db)]):
-
+async def get_users(
+    user_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
     result = await db.execute(select(models.User)
                               .where(models.User.id==user_id))
     user = result.scalars().first()
@@ -91,22 +92,44 @@ async def get_users(user_id: int,
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
 
-@router.get('/{user_id}/posts', response_model=list[PostResponse])
-async def get_user_posts(user_id: int,
-                        db: Annotated[AsyncSession, Depends(get_db)]):
+@router.get('/{user_id}/posts', response_model=PaginatedPostsResponse)
+async def get_user_posts(
+    user_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+):
     result = await db.execute(select(models.User).where(models.User.id==user_id))
     user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    result = await db.execute(select(models.Post)
-                              .options(selectinload(models.Post.author)) # this statement is used to load author object of Post whenever it is referred
-                              .where(models.Post.user_id==user_id))
-    posts = result.scalars().all()
+    count_result = await db.execute(
+        select(func.count())
+        .select_from(models.Post)
+        .where(models.Post.user_id==user_id),
+    )
+    total = count_result.scalar() or 0
     
-    if posts:
-        return posts
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posts not found")
+    result = await db.execute(
+        select(models.Post)
+        .options(selectinload(models.Post.author)) # this statement is used to load author object of Post whenever it is referred
+        .where(models.Post.user_id==user_id)
+        .order_by(models.Post.date_posted.desc())
+        .offset(skip)
+        .limit(limit),
+    )
+    posts = result.scalars().all()
+
+    has_more = skip + len(posts) < total
+    
+    return PaginatedPostsResponse(
+        posts=[PostResponse.model_validate(post) for post in posts],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=has_more,
+    )
 
 
 @router.patch('/{user_id}', response_model=UserPrivate)
