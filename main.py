@@ -3,16 +3,18 @@ from fastapi.responses import HTMLResponse
 from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 import models
+from config import settings
 from database import Base, engine, get_db
+from routers import posts, users
+
 
 from typing import Annotated
 from contextlib import asynccontextmanager
 
-from routers import posts, users
 
 
 @asynccontextmanager  # used for table creation at startup and shutdown
