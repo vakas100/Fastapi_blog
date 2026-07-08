@@ -1,7 +1,6 @@
 from email.message import EmailMessage
 
 import aiosmtplib
-from fastapi import BackgroundTasks
 
 from config import settings
 
@@ -36,15 +35,15 @@ async def send_password_reset_email(to_email: str, username: str, token: str) ->
 
     plain_text = f"""Hi {username},
 
-You requested a password reset. Please click the link below to reset your password:
-{reset_link}
+    You requested a password reset. Please click the link below to reset your password:
+    {reset_link}
 
-This link will expire in {settings.reset_token_expire_minutes} minutes.
+    This link will expire in {settings.reset_token_expire_minutes} minutes.
 
-If you did not request a password reset, please ignore this email.
-Best regards,  
-The FastAPI Blog Team
-"""
+    If you did not request a password reset, please ignore this email.
+    Best regards,  
+    The FastAPI Blog Team
+    """
 
     html_content = f"""<html>
     <body>
