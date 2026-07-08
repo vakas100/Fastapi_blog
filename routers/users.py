@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status, Query, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from PIL import UnidentifiedImageError
-from sqlalchemy import delte as sql_delete
+from sqlalchemy import delete as sql_delete
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -89,10 +89,14 @@ async def forgot_password(
     result = await db.execute(select(models.User).where(func.lower(models.User.email) == request_data.email.lower()))
     user = result.scalars().first()
 
-    if user:
-        await db.execute(
-            sql_delete(models.PasswordResetToken).where(models.PasswordResetToken.user_id == user.id)
-        )
+    response = {"message": "If that email is registered, a password reset email will be sent"}
+
+    if not user:
+        return response
+
+    await db.execute(
+        sql_delete(models.PasswordResetToken).where(models.PasswordResetToken.user_id == user.id)
+    )
     
     token = generate_reset_token()
     hashed_token = hash_reset_token(token)
@@ -114,7 +118,7 @@ async def forgot_password(
         token
     )
 
-    return {"message": "Password reset email sent"}
+    return response
 
 
 @router.post('/reset-password', status_code=status.HTTP_200_OK)
@@ -137,7 +141,7 @@ async def reset_password(
         await db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset token has expired")
 
-    result = await db.execute(select(models.user).where(models.User.id == reset_token.user_id))
+    result = await db.execute(select(models.User).where(models.User.id == reset_token.user_id))
     user = result.scalars().first()
 
     if not user:
@@ -149,6 +153,25 @@ async def reset_password(
     )
     await db.commit()
     return {"message": "Password has been reset successfully"}
+
+
+@router.post('/me/password', status_code=status.HTTP_200_OK)
+async def change_password(
+    password_data: ChangePasswordRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+
+    current_user.password_hash = hash_password(password_data.new_password)
+
+    await db.execute(
+        sql_delete(models.PasswordResetToken).where(models.PasswordResetToken.user_id == current_user.id)
+    )
+
+    await db.commit()
+    return {"message":"Password has been changed successfully"}
 
 @router.get('/{user_id}', response_model=UserPublic)
 async def get_users(
@@ -219,7 +242,7 @@ async def update_user_full(user_id: int,
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
     if user_update.username is not None and user_update.username.lower() != user.username.lower():
-        result = await db.execute(select(models.User).where(models.User.username==user_update.username))
+        result = await db.execute(select(models.User).where(func.lower(models.User.username)==user_update.username.lower()))
         existing_user = result.scalars().first()
         if existing_user:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
@@ -270,7 +293,7 @@ async def upload_profile_picture(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     if user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to delete this user")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to update this profile image")
     
     content = await file.read()
 
@@ -301,7 +324,7 @@ async def delete_profile_picture(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     if user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to delete this user")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to delete this profile image")
     
     old_filename = current_user.image_file
 

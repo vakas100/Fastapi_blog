@@ -60,7 +60,7 @@ async def create_post(post: PostCreate,
     
     db.add(new_post)
     await db.commit()
-    await db.refresh(new_post, attribute_names=["Author"])
+    await db.refresh(new_post, attribute_names=["author"])
 
     return new_post
 
@@ -71,7 +71,6 @@ async def get_post_using_postid(post_id : int, db: Annotated[AsyncSession, Depen
                         .where(models.Post.id==post_id))
     post = result.scalars().first()
     if post:
-        title = post.title[:50]
         return post
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
