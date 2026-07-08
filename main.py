@@ -1,21 +1,16 @@
-from fastapi import FastAPI, Request, HTTPException, status, Depends
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.staticfiles import StaticFiles
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload
-
-import models
-from config import settings
-from database import Base, engine, get_db
+from database import Base, engine
 from routers import posts, users
 
 
-from typing import Annotated
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 
+BASE_DIR = Path(__file__).resolve().parent
 
 @asynccontextmanager  # used for table creation at startup and shutdown
 async def lifespan(_app: FastAPI):
@@ -28,6 +23,8 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+app.mount("/media", StaticFiles(directory=BASE_DIR / "media", check_dir=False), name="media")
+
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
 
@@ -35,9 +32,6 @@ app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
 @app.get('/posts', response_class=HTMLResponse,include_in_schema=False)   # both these routes returns same thing to hide these in docs we use include in schema false
 def home(): 
     return f"<h1>Welcome to Fastapi Blog</h1>"
-
-
-
 
 
 
