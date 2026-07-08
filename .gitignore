@@ -1,5 +1,7 @@
-# templates
 __pycache__/
+*.py[cod]
 
 .env
 .venv/
+blog.db
+media/profile_pics/
