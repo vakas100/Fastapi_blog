@@ -1,0 +1,11 @@
+aiosmtplib
+aiosqlite
+fastapi
+pillow
+pydantic[email]
+pydantic-settings
+PyJWT
+pwdlib[argon2]
+python-multipart
+SQLAlchemy
+uvicorn[standard]
