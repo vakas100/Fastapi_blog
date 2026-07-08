@@ -116,6 +116,40 @@ async def forgot_password(
 
     return {"message": "Password reset email sent"}
 
+
+@router.post('/reset-password', status_code=status.HTTP_200_OK)
+async def reset_password(
+    request_data: RequestPasswordReset,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    token_hash = hash_reset_token(request_data.token)
+    result = await db.execute(
+        select(models.PasswordResetToken)
+        .where(models.PasswordResetToken.token_hash == token_hash)
+    )
+    reset_token = result.scalars().first()
+
+    if not reset_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
+
+    if reset_token.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
+        await db.delete(reset_token)
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset token has expired")
+
+    result = await db.execute(select(models.user).where(models.User.id == reset_token.user_id))
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found or expired token")
+
+    user.password_hash = hash_password(request_data.new_password)
+    await db.execute(
+        sql_delete(models.PasswordResetToken).where(models.PasswordResetToken.user_id == user.id)
+    )
+    await db.commit()
+    return {"message": "Password has been reset successfully"}
+
 @router.get('/{user_id}', response_model=UserPublic)
 async def get_users(
     user_id: int,
