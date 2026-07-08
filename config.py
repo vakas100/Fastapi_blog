@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
+    database_url: str = "sqlite+aiosqlite:///./blog.db"
+
     max_profile_image_size: int = 5 * 1024 * 1024 # 5MB
 
     posts_per_page: int = 10
